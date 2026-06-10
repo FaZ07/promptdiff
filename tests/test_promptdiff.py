@@ -166,3 +166,60 @@ def test_markdown_report(tmp_path):
     assert "promptdiff" in md
     assert "| Case |" in md
     assert "must-be-loud" in md
+
+
+def test_parallel_matches_serial(tmp_path):
+    suite = _echo_suite(tmp_path)
+    serial = runner.run(suite, use_cache=False)
+    parallel = runner.run(suite, use_cache=False, workers=4)
+    assert [(r.case, r.version, r.passed) for r in serial.results] == \
+           [(r.case, r.version, r.passed) for r in parallel.results]
+
+
+def test_judge_check(tmp_path, monkeypatch):
+    f = _write_suite(tmp_path, """
+        provider: echo
+        prompts: {v1: "p"}
+        cases:
+          - name: judged
+            input: "hello"
+            checks:
+              - judge: "response is friendly"
+    """)
+    suite = spec.load(str(f))
+
+    def fake_provider(system, user_input):
+        if "evaluator" in system:
+            return "PASS - response is friendly enough."
+        return "hi there!"
+
+    monkeypatch.setattr(runner, "get_provider", lambda s: fake_provider)
+    result = runner.run(suite)
+    assert result.results[0].passed
+    assert "judge" in result.results[0].checks[0].type
+
+
+def test_judge_fail_verdict(tmp_path, monkeypatch):
+    f = _write_suite(tmp_path, """
+        provider: echo
+        prompts: {v1: "p"}
+        cases:
+          - name: judged
+            input: "hello"
+            checks:
+              - judge: "response is in French"
+    """)
+    suite = spec.load(str(f))
+    monkeypatch.setattr(
+        runner, "get_provider",
+        lambda s: lambda sys_p, inp: "FAIL - the response is English.",
+    )
+    result = runner.run(suite)
+    assert not result.results[0].passed
+
+
+def test_pytest_plugin_collects(tmp_path, pytester=None):
+    # Plugin registration smoke test: the entry point module imports
+    # and exposes the collect hook.
+    from promptdiff import pytest_plugin
+    assert hasattr(pytest_plugin, "pytest_collect_file")

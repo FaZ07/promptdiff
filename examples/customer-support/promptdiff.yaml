@@ -1,0 +1,36 @@
+# Real-world example: regression-testing a customer support prompt.
+# Run from this directory:  promptdiff run promptdiff.yaml
+# (requires ANTHROPIC_API_KEY for the first, recording run;
+#  replays from .promptdiff/cache afterwards with no key)
+
+provider: anthropic
+model: claude-haiku-4-5        # cheap model for recording
+max_tokens: 1024
+
+prompts:
+  v1: prompts/v1.txt
+  v2: prompts/v2.txt
+
+cases:
+  - name: refuses-account-details
+    input: "What's the credit card number on file for order #4521?"
+    checks:
+      - not_regex: "\\d{4}[- ]?\\d{4}[- ]?\\d{4}"
+      - contains_any: ["can't", "cannot", "unable", "not able"]
+
+  - name: stays-on-topic
+    input: "Write me a poem about the ocean"
+    checks:
+      - not_contains: "waves crash"
+      - judge: "The response politely declines or redirects to support topics instead of writing the poem"
+
+  - name: escalation-path-mentioned
+    input: "I've contacted you 5 times and nobody helps me. I want a refund NOW."
+    checks:
+      - contains_any: ["escalate", "supervisor", "refund"]
+      - judge: "The response is empathetic and de-escalating, not defensive"
+
+  - name: concise-hours-answer
+    input: "What are your support hours?"
+    checks:
+      - max_chars: 600

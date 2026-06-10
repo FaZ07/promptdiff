@@ -66,8 +66,12 @@ def init(path: str) -> None:
 @click.option("--no-cache", is_flag=True, help="Ignore cached responses; call the provider fresh.")
 @click.option("--only", metavar="CASE", help="Run a single case by name.")
 @click.option("--md", "output_md", is_flag=True, help="Output a markdown report (for PR comments).")
+@click.option("--json", "output_json", is_flag=True, help="Output results as JSON.")
+@click.option("--workers", "-w", default=1, show_default=True,
+              help="Concurrent provider calls (speeds up real-API runs).")
 @click.option("--verbose", "-V", is_flag=True, help="Show model outputs for failing cases.")
-def run(path: str, no_cache: bool, only: str, output_md: bool, verbose: bool) -> None:
+def run(path: str, no_cache: bool, only: str, output_md: bool,
+        output_json: bool, workers: int, verbose: bool) -> None:
     """Run a suite. Exits 1 if any check fails, 2 on regression."""
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -76,9 +80,31 @@ def run(path: str, no_cache: bool, only: str, output_md: bool, verbose: bool) ->
     from .report import render_terminal, to_markdown
 
     suite = spec.load(path)
-    result = runner.run(suite, use_cache=not no_cache, only=only)
+    result = runner.run(suite, use_cache=not no_cache, only=only, workers=workers)
 
-    if output_md:
+    if output_json:
+        import json as json_mod
+        payload = {
+            "provider": result.suite_provider,
+            "model": result.model,
+            "versions": result.versions,
+            "passed": len(result.results) - result.failed,
+            "failed": result.failed,
+            "regressions": result.regressions(),
+            "results": [
+                {
+                    "case": r.case, "version": r.version, "passed": r.passed,
+                    "cached": r.cached, "error": r.error,
+                    "checks": [
+                        {"type": c.type, "passed": c.passed, "detail": c.detail}
+                        for c in r.checks
+                    ],
+                }
+                for r in result.results
+            ],
+        }
+        click.echo(json_mod.dumps(payload, indent=2))
+    elif output_md:
         click.echo(to_markdown(result))
     else:
         render_terminal(result, verbose=verbose)

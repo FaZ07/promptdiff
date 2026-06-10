@@ -1,0 +1,54 @@
+name: "promptdiff - Prompt Regression Tests"
+description: "Run prompt regression tests on every PR. Uses cached responses by default, so no API keys are needed in CI."
+author: "Mohamed Fazil"
+branding:
+  icon: "git-pull-request"
+  color: "purple"
+
+inputs:
+  suite:
+    description: "Path to the suite YAML"
+    required: false
+    default: "promptdiff.yaml"
+  comment:
+    description: "Post the report as a PR comment (true/false)"
+    required: false
+    default: "true"
+  github-token:
+    description: "Token used to post the PR comment"
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install promptdiff
+      shell: bash
+      run: pip install --quiet "${{ github.action_path }}"
+
+    - name: Run suite and build report
+      shell: bash
+      run: |
+        set +e
+        promptdiff run "${{ inputs.suite }}" --md > promptdiff-report.md
+        echo "PROMPTDIFF_EXIT=$?" >> "$GITHUB_ENV"
+        cat promptdiff-report.md >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Comment on PR
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        gh pr comment "${{ github.event.pull_request.number }}" \
+          --repo "${{ github.repository }}" \
+          --body-file promptdiff-report.md \
+          || echo "::warning::Could not post PR comment (check token permissions)"
+
+    - name: Enforce result
+      shell: bash
+      run: |
+        if [ "$PROMPTDIFF_EXIT" = "2" ]; then
+          echo "::error::Prompt regression detected"
+        fi
+        exit "$PROMPTDIFF_EXIT"

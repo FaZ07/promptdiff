@@ -36,7 +36,7 @@ class Suite:
 VALID_CHECKS = {
     "contains", "not_contains", "contains_any", "equals",
     "regex", "not_regex", "json_valid", "json_keys",
-    "max_chars", "min_chars", "similar_to",
+    "max_chars", "min_chars", "similar_to", "judge",
 }
 
 

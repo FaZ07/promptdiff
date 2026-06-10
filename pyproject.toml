@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "promptdiff"
+version = "1.0.0"
+description = "Regression testing for LLM prompts - catch what your prompt change silently broke. Record once, replay free in CI."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Mohamed Fazil", email = "mohamedfazil1812700@gmail.com" }]
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.0",
+    "rich>=13.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.0"]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+promptdiff = "promptdiff.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/FaZ07/promptdiff"
+Repository = "https://github.com/FaZ07/promptdiff"
+
+[tool.hatch.build.targets.wheel]
+packages = ["promptdiff"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
